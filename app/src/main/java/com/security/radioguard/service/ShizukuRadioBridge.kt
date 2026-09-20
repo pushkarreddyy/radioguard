@@ -38,6 +38,21 @@ object ShizukuRadioBridge {
             Shizuku.requestPermission(SHIZUKU_PERMISSION_CODE)
         }
     }
+    private fun runShizukuProcess(cmd: Array<String>): Process? {
+        return try {
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
+            method.invoke(null, cmd, null, null) as? Process
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to invoke Shizuku process: ${e.message}", e)
+            null
+        }
+    }
 
     /**
      * Executes baseband band lock to LTE/NR only, completely immunizing the device from 2G SMS blasters.
@@ -48,10 +63,9 @@ object ShizukuRadioBridge {
 
         return try {
             // Use canonical absolute path /system/bin/cmd to defeat PATH manipulation / subprocess hijacking
-            val process = Shizuku.newProcess(
-                arrayOf("/system/bin/cmd", "phone", "set-allowed-network-types", "user", "6"), // 6 = LTE | NR
-                null, null
-            )
+            val process = runShizukuProcess(
+                arrayOf("/system/bin/cmd", "phone", "set-allowed-network-types", "user", "6") // 6 = LTE | NR
+            ) ?: return false
             process.waitFor() == 0
         } catch (e: Exception) {
             Log.e(TAG, "Failed to disable 2G via Shizuku: ${e.message}", e)
@@ -66,11 +80,11 @@ object ShizukuRadioBridge {
         if (!hasShizukuPermission()) return false
 
         return try {
-            val p1 = Shizuku.newProcess(arrayOf("/system/bin/cmd", "connectivity", "airplane-mode", "enable"), null, null)
-            p1.waitFor()
+            val p1 = runShizukuProcess(arrayOf("/system/bin/cmd", "connectivity", "airplane-mode", "enable"))
+            p1?.waitFor()
             Thread.sleep(2000)
-            val p2 = Shizuku.newProcess(arrayOf("/system/bin/cmd", "connectivity", "airplane-mode", "disable"), null, null)
-            p2.waitFor() == 0
+            val p2 = runShizukuProcess(arrayOf("/system/bin/cmd", "connectivity", "airplane-mode", "disable"))
+            p2?.waitFor() == 0
         } catch (e: Exception) {
             Log.e(TAG, "Failed to pulse airplane mode: ${e.message}", e)
             false

@@ -6,6 +6,9 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.security.radioguard.data.model.TowerEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Database(
     entities = [TowerEntity::class, com.security.radioguard.data.model.IncidentEntity::class],
@@ -31,7 +34,7 @@ abstract class TowerDatabase : RoomDatabase() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
                         // Seed initial baseline verification records so database is operational out-of-the-box
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        CoroutineScope(Dispatchers.IO).launch {
                             seedStarterBaseline(getInstance(context).towerDao())
                         }
                     }

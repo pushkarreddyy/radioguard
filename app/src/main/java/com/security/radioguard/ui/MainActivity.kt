@@ -54,12 +54,11 @@ class MainActivity : ComponentActivity() {
 
         requestRequiredPermissions()
 
-        val deviceStatus = remember {
-            com.security.radioguard.security.DeviceIntegritySentry.assessDeviceIntegrity(this)
-        }
-
         setContent {
             RadioGuardTheme {
+                val deviceStatus = remember {
+                    com.security.radioguard.security.DeviceIntegritySentry.assessDeviceIntegrity(this@MainActivity)
+                }
                 val isSentryRunning by RadioGuardService.isServiceRunning.collectAsState()
                 val isVpnActive by SafeTunnelVpnService.isVpnActive.collectAsState()
                 val latestReport by RadioGuardService.latestReport.collectAsState()

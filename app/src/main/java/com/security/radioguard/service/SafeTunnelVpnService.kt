@@ -91,8 +91,7 @@ class SafeTunnelVpnService : VpnService() {
             builder.allowFamily(OsConstants.AF_INET)
             builder.allowFamily(OsConstants.AF_INET6)
 
-            // 4. Prohibit apps from bypassing the safe tunnel & disallow local bypass
-            builder.allowBypass(false)
+            // 4. Prohibit apps from bypassing the safe tunnel (bypass is disallowed by default)
             builder.setUnderlyingNetworks(arrayOf())
             builder.setSession("RadioGuard Safe Quarantine Tunnel (TunnelCrack Hardened)")
 

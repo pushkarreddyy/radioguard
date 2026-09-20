@@ -34,7 +34,7 @@ object SmsFilterHelper {
             val sender = message.originatingAddress ?: "Unknown"
 
             // 0x40 is TP-PID Short Message Type 0 (Silent Ping)
-            val isSilentPing = protocolId == 0x40 || message.isTypeZero
+            val isSilentPing = protocolId == 0x40
 
             // Check if sender looks like a spoofed alphanumeric brand tag (e.g., "BankAlert")
             val isAlphaSender = sender.matches(Regex("^[a-zA-Z]{3,11}$"))
