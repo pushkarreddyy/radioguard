@@ -115,11 +115,6 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Active Connection Details
-        ActiveCellDetailsCard(report = report)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Quick Defense Controls
         DefenseControlsCard(
             isSentryRunning = isSentryRunning,
