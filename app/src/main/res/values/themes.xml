@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.RadioGuard" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/brand_background</item>
+        <item name="android:navigationBarColor">@color/brand_background</item>
+        <item name="android:windowBackground">@color/brand_background</item>
+    </style>
+</resources>

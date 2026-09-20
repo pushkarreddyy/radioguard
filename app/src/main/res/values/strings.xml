@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">RadioGuard</string>
+    <string name="service_name">RadioGuard Cellular Sentry</string>
+    <string name="channel_name">RadioGuard Status &amp; Alerts</string>
+    <string name="channel_desc">Active notifications for rogue cell tower detection and safe routing quarantine</string>
+    <string name="threat_normal">NORMAL / SECURE</string>
+    <string name="threat_suspicious">SUSPICIOUS ANOMALY DETECTED</string>
+    <string name="threat_rogue">ROGUE TOWER CONFIRMED - QUARANTINE ACTIVE</string>
+</resources>

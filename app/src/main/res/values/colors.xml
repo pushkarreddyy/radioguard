@@ -1,0 +1,8 @@
+<resources>
+    <color name="brand_primary">#00E5FF</color>
+    <color name="brand_background">#0D1117</color>
+    <color name="brand_surface">#161B22</color>
+    <color name="threat_safe">#00E676</color>
+    <color name="threat_warning">#FFD600</color>
+    <color name="threat_critical">#FF1744</color>
+</resources>
