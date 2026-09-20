@@ -7,22 +7,56 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mockito.*
 
 class AnomalyEngineTest {
 
-    private lateinit var mockTowerDao: TowerDao
+    private class FakeTowerDao : TowerDao {
+        val towers = mutableMapOf<String, TowerEntity>()
+        val incidents = mutableListOf<IncidentEntity>()
+
+        override suspend fun findTower(mcc: Int, mnc: Int, areaCode: Int, cellId: Long): TowerEntity? {
+            return towers["$mcc-$mnc-$areaCode-$cellId"]
+        }
+
+        override suspend fun findTowersInBoundingBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<TowerEntity> {
+            return towers.values.filter { it.latitude in minLat..maxLat && it.longitude in minLon..maxLon }
+        }
+
+        override suspend fun getTotalTowerCount(): Int = towers.size
+
+        override suspend fun insertTowers(towersList: List<TowerEntity>) {
+            towersList.forEach { towers["${it.mcc}-${it.mnc}-${it.areaCode}-${it.cellId}"] = it }
+        }
+
+        override suspend fun clearDatabase() { towers.clear() }
+
+        override suspend fun logIncident(incident: IncidentEntity) { incidents.add(incident) }
+
+        override suspend fun getRecentIncidents(): List<IncidentEntity> = incidents.takeLast(50)
+
+        override suspend fun getAllIncidentsForExport(): List<IncidentEntity> = incidents.toList()
+
+        override suspend fun pruneOldIncidents() {
+            if (incidents.size > 1000) {
+                val toRemove = incidents.size - 1000
+                repeat(toRemove) { incidents.removeAt(0) }
+            }
+        }
+
+        override suspend fun clearIncidentLogs() { incidents.clear() }
+    }
+
+    private lateinit var fakeTowerDao: FakeTowerDao
     private lateinit var anomalyEngine: AnomalyEngine
 
     @Before
     fun setup() {
-        mockTowerDao = mock(TowerDao::class.java)
-        anomalyEngine = AnomalyEngine(mockTowerDao)
+        fakeTowerDao = FakeTowerDao()
+        anomalyEngine = AnomalyEngine(fakeTowerDao)
     }
 
     @Test
     fun testNormalCellProducesSafeScore() = runBlocking {
-        // Normal 4G cell with neighbors and matching database entry
         val obs = CellObservation(
             generation = RadioGeneration.LTE_4G,
             mcc = 310,
@@ -39,7 +73,7 @@ class AnomalyEngineTest {
             radio = "LTE", latitude = 37.7749, longitude = -122.4194,
             rangeMeters = 2500, verifiedSamples = 150
         )
-        `when`(mockTowerDao.findTower(310, 410, 12014, 1004521L)).thenReturn(tower)
+        fakeTowerDao.insertTowers(listOf(tower))
 
         val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = true)
         assertEquals(ThreatLevel.SAFE, report.threatLevel)
@@ -49,7 +83,6 @@ class AnomalyEngineTest {
 
     @Test
     fun testInvoluntary2GDowngradeTriggersAlert() = runBlocking {
-        // Involuntary drop from LTE to 2G GSM
         val obs = CellObservation(
             generation = RadioGeneration.GSM_2G,
             mcc = 310,
@@ -60,7 +93,6 @@ class AnomalyEngineTest {
             rsrpDbm = -65,
             neighborCount = 0
         )
-        `when`(mockTowerDao.findTower(310, 410, 9999, 5555L)).thenReturn(null)
 
         val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = true)
         assertTrue(report.reasons.any { it.contains("forced downgrade", ignoreCase = true) })
@@ -69,7 +101,6 @@ class AnomalyEngineTest {
 
     @Test
     fun testMacroCellShadowCloneTriggersHighRisk() = runBlocking {
-        // First observation: normal signal
         val obs1 = CellObservation(
             generation = RadioGeneration.LTE_4G,
             mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L,
@@ -77,7 +108,6 @@ class AnomalyEngineTest {
         )
         anomalyEngine.analyzeObservation(obs1, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = true)
 
-        // Instantaneous power jump (+38 dBm) on the exact same Cell ID
         val obs2 = CellObservation(
             generation = RadioGeneration.LTE_4G,
             mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L,
