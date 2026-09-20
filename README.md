@@ -1,5 +1,9 @@
 # RadioGuard: Zero-Trust Cellular Defense Sub-Service for Android
 
+[![Build, Test & Release APK](https://github.com/pushkarreddyy/radioguard/actions/workflows/ci.yml/badge.svg)](https://github.com/pushkarreddyy/radioguard/actions/workflows/ci.yml)
+[![Download APK](https://img.shields.io/badge/Download-Release%20APK-00E5FF?logo=android)](https://github.com/pushkarreddyy/radioguard/releases)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **RadioGuard** is an open-source, production-ready Android security application and background sub-service. It actively detects rogue cell towers (IMSI-catchers / Cell-Site Simulators / SMS Blasters), identifies hostile 2G/4G cellular manipulation, and deploys cryptographic safe-routing quarantine to protect mobile devices on untrusted cellular links.
 
 ---
