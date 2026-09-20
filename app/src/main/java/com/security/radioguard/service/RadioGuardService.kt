@@ -196,6 +196,7 @@ class RadioGuardService : Service() {
                     reasonsSummary = report.reasons.joinToString("; "),
                     deviceLatitude = userLocation?.first,
                     deviceLongitude = userLocation?.second
+                )
                 val dao = RadioGuardApp.instance.database.towerDao()
                 dao.logIncident(incident)
                 dao.pruneOldIncidents()
