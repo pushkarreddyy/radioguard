@@ -99,7 +99,7 @@ class AnomalyEngine(private val towerDao: TowerDao) {
             val eNodeBId = obs.cellId / 256
             if (sectorId > 31 || eNodeBId == 0L) {
                 probabilityFactors.add(0.45f)
-                reasons.add("Non-standard eNodeB Sector Topology (Sector ID $sectorId anomalous for licensed macro-site)")
+                reasons.add("eNodeB Sector Topology Anomaly: Sector ID $sectorId anomalous for licensed macro-site")
             }
         }
 

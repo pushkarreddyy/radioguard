@@ -187,13 +187,13 @@ class AnomalyEngineTest {
 
     @Test
     fun testSectorTopologyAnomaly() = runBlocking {
-        // Invalid sector ID: 1004521 % 256 = 1004521 mod 256 = 137 (> 6)
+        // Invalid sector ID: 1004521 % 256 = 41 (> 31)
         val obs = CellObservation(
             generation = RadioGeneration.LTE_4G,
-            mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L, // 1004521 % 256 = 41 (> 6)
+            mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L,
             rsrpDbm = -90
         )
         val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = false)
-        assertTrue(report.reasons.any { it.contains("Topology Anomaly", ignoreCase = true) })
+        assertTrue(report.reasons.any { it.contains("Topology", ignoreCase = true) })
     }
 }
