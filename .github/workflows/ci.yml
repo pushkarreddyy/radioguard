@@ -45,7 +45,11 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          ./gradlew testDebugUnitTest --continue --no-daemon
+          ./gradlew testDebugUnitTest --continue --stacktrace --no-daemon || {
+            echo "=== UNIT TESTS FAILED: DUMPING TEST RESULTS ==="
+            find app/build/test-results -name "*.xml" -exec cat {} + 2>/dev/null || true
+            exit 1
+          }
 
       - name: Build Debug APK
         run: |

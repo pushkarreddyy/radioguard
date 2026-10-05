@@ -24,7 +24,7 @@ data class CellObservation(
     val mnc: Int,
     val areaCode: Int, // LAC for 2G/3G, TAC for 4G/5G
     val cellId: Long,  // CID or ECI
-    val pci: Int?,     // Physical Cell ID (LTE/5G)
+    val pci: Int? = null,     // Physical Cell ID (LTE/5G)
     val rsrpDbm: Int,  // Signal power
     val timingAdvance: Int? = null,
     val neighborCount: Int = 0,
