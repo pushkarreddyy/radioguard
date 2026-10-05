@@ -59,7 +59,15 @@ jobs:
 
       - name: Build Debug APK
         run: |
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee gradle_build_output.txt
+
+      - name: Upload Build Diagnostic Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-diagnostic
+          path: gradle_build_output.txt
+          retention-days: 7
 
       - name: Rename APK for Distribution
         run: |

@@ -513,8 +513,10 @@ fun CellularRadarCard(report: AnomalyReport?) {
                         val ta = obs.timingAdvance ?: 1
                         val distFraction = (ta / 30f).coerceIn(0.25f, 0.95f)
                         val angleRad = -Math.PI / 4.0 // 45 degrees north-east
-                        val servingX = center.x + (maxRadius * distFraction * Math.cos(angleRad)).toFloat()
-                        val servingY = center.y + (maxRadius * distFraction * Math.sin(angleRad)).toFloat()
+                        val cosVal = Math.cos(angleRad).toFloat()
+                        val sinVal = Math.sin(angleRad).toFloat()
+                        val servingX = center.x + (maxRadius * distFraction * cosVal)
+                        val servingY = center.y + (maxRadius * distFraction * sinVal)
 
                         // Serving vector line
                         drawLine(
@@ -535,9 +537,11 @@ fun CellularRadarCard(report: AnomalyReport?) {
                         val neighborCount = obs.neighborCount.coerceAtMost(6)
                         for (i in 0 until neighborCount) {
                             val neighborAngle = (i * (2 * Math.PI / 6.0)) + 1.2
+                            val cosN = Math.cos(neighborAngle).toFloat()
+                            val sinN = Math.sin(neighborAngle).toFloat()
                             val nDist = maxRadius * (0.45f + (i % 3) * 0.18f)
-                            val nx = center.x + (nDist * Math.cos(neighborAngle)).toFloat()
-                            val ny = center.y + (nDist * Math.sin(neighborAngle)).toFloat()
+                            val nx = center.x + (nDist * cosN)
+                            val ny = center.y + (nDist * sinN)
                             drawCircle(
                                 color = Color.Gray.copy(alpha = 0.7f),
                                 radius = 3.dp.toPx(),
