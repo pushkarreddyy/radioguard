@@ -23,10 +23,15 @@ class AnomalyEngine(private val towerDao: TowerDao) {
         val reasons = mutableListOf<String>()
         val probabilityFactors = mutableListOf<Float>()
 
-        // 0. Active Quarantine Blacklist Guard
+        // 0. Active Quarantine Blacklist Guard (Immediate entrapment bypassing hysteresis)
         if (towerDao.isCellQuarantined(obs.mcc, obs.mnc, obs.areaCode, obs.cellId)) {
-            probabilityFactors.add(0.99f)
-            reasons.add("Quarantined Rogue Cell: Tower is blacklisted in active quarantine registry")
+            return AnomalyReport(
+                threatLevel = ThreatLevel.CRITICAL_ROGUE,
+                riskScore = 0.99f,
+                reasons = listOf("Active Quarantine: Tower signature is blacklisted in local rogue cell registry"),
+                observation = obs,
+                isQuarantined = true
+            )
         }
 
         // 1. Sudden Involuntary 2G Downgrade Vector
