@@ -60,7 +60,15 @@ jobs:
       - name: Build Debug APK
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee gradle_build_output.txt
+          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee gradle_build_output.txt || {
+            BUILD_STATUS=$?
+            echo "::error title=Gradle Build Failed::assembleDebug exited with code $BUILD_STATUS"
+            echo "### ❌ Gradle Build Failure Log (Last 100 lines)" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            tail -n 100 gradle_build_output.txt >> $GITHUB_STEP_SUMMARY || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit $BUILD_STATUS
+          }
 
       - name: Upload Build Diagnostic Artifact
         if: always()
