@@ -108,9 +108,9 @@ data class QuarantinedCellEntity(
     val mnc: Int,
     val areaCode: Int,
     val cellId: Long,
-    val threatScore: Float,
+    val threatScore: Float = 0.99f,
     val detectedTimestamp: Long = System.currentTimeMillis(),
-    val reason: String
+    val reason: String = "Confirmed Rogue Cell"
 )
 
 

@@ -143,7 +143,8 @@ class AnomalyEngineTest {
         fakeTowerDao.quarantineCell(
             QuarantinedCellEntity(
                 mcc = 310, mnc = 410, areaCode = 12014, cellId = 999999L,
-                quarantinedAt = System.currentTimeMillis(),
+                threatScore = 0.99f,
+                detectedTimestamp = System.currentTimeMillis(),
                 reason = "Known IMSI Catcher Signature"
             )
         )
