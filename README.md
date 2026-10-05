@@ -182,14 +182,19 @@ test_05_spatial_drift_detection .......................... [OK]
 test_06_tunnelcrack_dual_route_coverage .................. [OK]
 test_07_storage_bounds_circular_pruning .................. [OK]
 test_08_emergency_call_fail_safe_transitions ............. [OK]
+test_09_quarantine_blacklist_immediate_trap .............. [OK]
+test_10_extreme_neighbor_dominance ....................... [OK]
+test_11_physics_path_loss_violation ...................... [OK]
+test_12_sector_topology_anomaly .......................... [OK]
+test_13_tac_hopping_sentry ............................... [OK]
+test_14_hmac_sha256_forensic_integrity ................... [OK]
 
-Ran 8 tests in 0.001s - OK (100% Passing)
+Ran 14 tests in 0.012s - OK (100% Passing)
 ```
 
 Additionally, unit tests for Android Studio / Gradle builds are located at:
 * `app/src/test/java/com/security/radioguard/AnomalyEngineTest.kt`
 * `app/src/test/java/com/security/radioguard/UiAndStateTest.kt`
-
 
 ---
 
