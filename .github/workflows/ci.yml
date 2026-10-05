@@ -59,6 +59,7 @@ jobs:
 
       - name: Build Debug APK
         run: |
+          set -o pipefail
           ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee gradle_build_output.txt
 
       - name: Upload Build Diagnostic Artifact
@@ -72,7 +73,14 @@ jobs:
       - name: Rename APK for Distribution
         run: |
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/RadioGuard-v1.0.0-debug.apk
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No APK found in app/build/outputs/apk!"
+            ls -la app/build/outputs || true
+            exit 1
+          fi
+          echo "Found APK at $APK_PATH, copying to release-artifacts/RadioGuard-v1.0.0-debug.apk"
+          cp "$APK_PATH" release-artifacts/RadioGuard-v1.0.0-debug.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

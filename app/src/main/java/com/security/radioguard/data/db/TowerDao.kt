@@ -60,8 +60,10 @@ interface TowerDao {
     // --- Active Rogue Cell Quarantine Blacklist Queries ---
 
     @Query("""
-        SELECT COUNT(*) > 0 FROM quarantined_cells 
-        WHERE mcc = :mcc AND mnc = :mnc AND areaCode = :areaCode AND cellId = :cellId
+        SELECT EXISTS(
+            SELECT 1 FROM quarantined_cells 
+            WHERE mcc = :mcc AND mnc = :mnc AND areaCode = :areaCode AND cellId = :cellId
+        )
     """)
     suspend fun isCellQuarantined(mcc: Int, mnc: Int, areaCode: Int, cellId: Long): Boolean
 
