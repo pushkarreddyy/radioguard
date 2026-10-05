@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.security.radioguard.RadioGuardApp
+import com.security.radioguard.data.db.TowerDatabase
 import com.security.radioguard.security.AppIntegrityValidator
 import com.security.radioguard.service.RadioGuardService
 import com.security.radioguard.service.SafeTunnelVpnService
