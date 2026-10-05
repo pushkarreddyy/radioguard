@@ -70,28 +70,36 @@ Cellular networks (2G, 3G, and 4G LTE) suffer from foundational protocol weaknes
 
 ## Key Features
 
-1. **Multi-Factor Anomaly Scoring Engine (MFASE)**:
-   * **Spatial Cross-Validation**: Compares observed tower location against an offline local SQLite database (sourced from OpenCelliD and BeaconDB). Flags deviations $> 10\text{ km}$.
-   * **Isolation Trap Detection**: Detects rogue LTE eNodeBs broadcasting empty SIB4/SIB5 neighbor lists.
-   * **Involuntary 2G Downgrade Sentry**: Flags sudden forced drop-downs from 4G/5G to legacy unauthenticated 2G GSM.
-   * **Timing Advance Sanity**: Validates baseband round-trip timing against device physical coordinates.
-2. **Safe-Routing Quarantine & Kill-Switch**:
+1. **MimicHunter / RadioFingerprint Detection Engine**:
+   * **Physics-Based Timing Advance (TA) vs. RSRP Path-Loss Verification**: Validates observed RSRP against free-space propagation models (\(TA \ge 10\) with \(RSRP \ge -55\text{ dBm}\) triggers instant flags for close-proximity portable IMSI catchers masquerading as distant macro towers).
+   * **Extreme Neighbor RF Dominance Anomaly**: Flags serving cells that unnaturally suppress or overpower neighbor macro cells by $> 35\text{ dB}$, a classic fingerprint of Cell-Site Simulators forcing cell reselection.
+   * **Tracking Area Code (TAC) Hopping Sentry**: Detects rapid LAC/TAC oscillations while the device remains physically stationary ($< 350\text{ m}$), trapping identity-harvesting brute-force sweeps.
+   * **eNodeB / Sector Topology Bounds**: Validates 3GPP sector topologies, flagging anomalous configurations ($sectorId > 31$ or $eNodeB == 0$).
+   * **Wi-Fi BSSID Geofence Cross-Correlation**: Compares Wi-Fi access point geofences against cellular tower locations to detect synthetic baseband coordinates ($> 15\text{ km}$ divergence).
+   * **Macro-Cell Shadow Clone Detector**: Step-gradient $\Delta RSRP$ surge tracking ($> 25\text{ dB}$ surge in $< 4\text{s}$ on an identical cell ID).
+   * **Spatial Cross-Validation**: Validates tower identities against local SQLite database.
+2. **Active Rogue Quarantine Blacklist**:
+   * Automatically isolates verified rogue towers and adds them to `quarantined_cells`.
+   * Intercepts baseband handovers and triggers automated Shizuku radio resets when a device is locked onto a quarantined cell signature.
+3. **Regional Ground-Truth Dataset Sync Packs**:
+   * Fast-sync offline macro-tower baseline packs for **US (FCC / OpenCelliD)**, **EU (ETSI / OpenCelliD)**, **ASIA (3GPP / OpenCelliD)**, and **GLOBAL** into encrypted local SQLite storage.
+4. **Geospatial Cellular Radar & Vector Display**:
+   * Interactive high-tech radar interface showing serving tower distance vectors, neighbor blip topology, RF dominance margins, and real-time sweep status.
+5. **Safe-Routing Quarantine & Kill-Switch**:
    * Employs Android’s native `VpnService` with `setBlocking(true)` as an OS-enforced killswitch.
    * **Dual `/1` Route Splitting**: Defeats **TunnelCrack (CVE-2023-36672 / CVE-2023-35838)** by splitting routes into `0.0.0.0/1` and `128.0.0.0/1`, overriding any malicious local subnet routing redirects.
    * **Zero Domain Race**: Uses hardcoded IP literals (`9.9.9.9`, `1.1.1.1`) with SPKI certificate pinning to prevent pre-tunnel aLTEr DNS hijacking.
-3. **Emergency 911/112 Fail-Safe**:
+6. **Adaptive Battery Duty-Cycle Watchdog**:
+   * Dynamically modulates telemetry polling between 30 seconds (when stationary and safe) down to 3 seconds (when in transit or facing elevated RF anomalies), conserving battery life while maintaining zero-trust protection.
+7. **Emergency 911/112 Fail-Safe**:
    * Hooks `TelephonyCallback.CallStateListener`.
-   * The millisecond an emergency call is dialed (911, 112, 999), RadioGuard **instantly suspends the VPN killswitch** and restores all radio bands, ensuring compliance with E911 dispatch regulations. Automatically re-engages once the call hangs up.
-4. **SMS Blaster & Silent SMS Protection**:
-   * Inspects incoming SMS PDUs for **Type-0 (Silent SMS / TP-PID 0x40)** pings used by surveillance gear for radio direction finding.
-   * Flags suspicious alphanumeric shortcode messages arriving over unauthenticated 2G cells.
-5. **Pre-Existing Device Compromise Sentry**:
-   * Audits whether the host OS has already been compromised by malware, rootkits, or mercenary spyware (checking for `su` binaries, Magisk, SELinux in Permissive mode, test-keys, or missing hardware KeyStore/TEE).
-6. **Forensic Incident Audit Log & JSON Export**:
-   * Persists timestamped, evidence-grade logs of detected rogue towers, signal spikes, and silent pings into local SQLite.
-   * One-click JSON export for sharing with legal counsel, regulators (FCC), or security researchers.
-7. **Non-Root Radio Bridge (via Shizuku)**:
-   * Allows power users to lock radio bands (disable 2G) or pulse Airplane mode to break a rogue tower's reselection lock without rooting the device.
+   * Instantly suspends the VPN killswitch and restores all radio bands during emergency calls.
+8. **Cryptographic HMAC-SHA256 STIX 2.1 Forensic Evidence**:
+   * Standardized STIX 2.1 Threat Indicator JSON exports with HMAC-SHA256 digital signature chain-of-custody for legal, FCC, or cybersecurity forensic audits.
+9. **SMS Blaster & Silent SMS Protection**:
+   * Inspects incoming SMS PDUs for **Type-0 (Silent SMS / TP-PID 0x40)** pings and 2G shortcode spam.
+10. **Non-Root Radio Bridge (via Shizuku)**:
+    * Breaks rogue cell locks and toggles airplane mode programmatically without requiring root privileges.
 
 ---
 

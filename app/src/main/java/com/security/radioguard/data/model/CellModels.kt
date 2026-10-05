@@ -28,6 +28,10 @@ data class CellObservation(
     val rsrpDbm: Int,  // Signal power
     val timingAdvance: Int? = null,
     val neighborCount: Int = 0,
+    val maxNeighborRsrpDbm: Int? = null,
+    val wifiBssid: String? = null,
+    val wifiLatitude: Double? = null,
+    val wifiLongitude: Double? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -88,4 +92,25 @@ data class IncidentEntity(
     val deviceLatitude: Double?,
     val deviceLongitude: Double?
 )
+
+/**
+ * Active Rogue Cell Quarantine Blacklist Entity.
+ * Persists confirmed hostile/rogue base stations to block immediate reconnection.
+ */
+@Entity(
+    tableName = "quarantined_cells",
+    indices = [Index(value = ["mcc", "mnc", "areaCode", "cellId"], unique = true)]
+)
+data class QuarantinedCellEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val mcc: Int,
+    val mnc: Int,
+    val areaCode: Int,
+    val cellId: Long,
+    val threatScore: Float,
+    val detectedTimestamp: Long = System.currentTimeMillis(),
+    val reason: String
+)
+
 

@@ -14,6 +14,8 @@ class AnomalyEngineTest {
         val towers = mutableMapOf<String, TowerEntity>()
         val incidents = mutableListOf<IncidentEntity>()
 
+        val quarantinedCells = mutableMapOf<String, QuarantinedCellEntity>()
+
         override suspend fun findTower(mcc: Int, mnc: Int, areaCode: Int, cellId: Long): TowerEntity? {
             return towers["$mcc-$mnc-$areaCode-$cellId"]
         }
@@ -44,6 +46,24 @@ class AnomalyEngineTest {
         }
 
         override suspend fun clearIncidentLogs() { incidents.clear() }
+
+        override suspend fun isCellQuarantined(mcc: Int, mnc: Int, areaCode: Int, cellId: Long): Boolean {
+            return quarantinedCells.containsKey("$mcc-$mnc-$areaCode-$cellId")
+        }
+
+        override suspend fun quarantineCell(cell: QuarantinedCellEntity) {
+            quarantinedCells["${cell.mcc}-${cell.mnc}-${cell.areaCode}-${cell.cellId}"] = cell
+        }
+
+        override suspend fun getAllQuarantinedCells(): List<QuarantinedCellEntity> = quarantinedCells.values.toList()
+
+        override suspend fun unquarantineCell(mcc: Int, mnc: Int, areaCode: Int, cellId: Long) {
+            quarantinedCells.remove("$mcc-$mnc-$areaCode-$cellId")
+        }
+
+        override suspend fun clearQuarantinedCells() {
+            quarantinedCells.clear()
+        }
     }
 
     private lateinit var fakeTowerDao: FakeTowerDao
@@ -116,5 +136,64 @@ class AnomalyEngineTest {
         val report2 = anomalyEngine.analyzeObservation(obs2, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = true)
 
         assertTrue(report2.reasons.any { it.contains("Macro-Cell Shadow Clone", ignoreCase = true) })
+    }
+
+    @Test
+    fun testQuarantinedCellTrappedImmediately() = runBlocking {
+        fakeTowerDao.quarantineCell(
+            QuarantinedCellEntity(
+                mcc = 310, mnc = 410, areaCode = 12014, cellId = 999999L,
+                quarantinedAt = System.currentTimeMillis(),
+                reason = "Known IMSI Catcher Signature"
+            )
+        )
+
+        val obs = CellObservation(
+            generation = RadioGeneration.LTE_4G,
+            mcc = 310, mnc = 410, areaCode = 12014, cellId = 999999L,
+            rsrpDbm = -80
+        )
+        val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = false)
+        assertTrue(report.isQuarantined)
+        assertEquals(ThreatLevel.CRITICAL_ROGUE, report.threatLevel)
+        assertEquals(0.99f, report.riskScore, 0.01f)
+    }
+
+    @Test
+    fun testExtremeNeighborRfDominanceAnomaly() = runBlocking {
+        val obs = CellObservation(
+            generation = RadioGeneration.LTE_4G,
+            mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L,
+            rsrpDbm = -52,
+            maxNeighborRsrpDbm = -96, // Dominance = 44 dB > 35 dB threshold
+            neighborCount = 3
+        )
+        val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = false)
+        assertTrue(report.reasons.any { it.contains("RF Dominance Anomaly", ignoreCase = true) })
+    }
+
+    @Test
+    fun testPhysicsTimingAdvanceRsrpViolation() = runBlocking {
+        // High Timing Advance (12 => ~6.6km) but unusually high RSRP (-50 dBm)
+        val obs = CellObservation(
+            generation = RadioGeneration.LTE_4G,
+            mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L,
+            rsrpDbm = -50,
+            timingAdvance = 12
+        )
+        val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = false)
+        assertTrue(report.reasons.any { it.contains("Propagation Anomaly", ignoreCase = true) })
+    }
+
+    @Test
+    fun testSectorTopologyAnomaly() = runBlocking {
+        // Invalid sector ID: 1004521 % 256 = 1004521 mod 256 = 137 (> 6)
+        val obs = CellObservation(
+            generation = RadioGeneration.LTE_4G,
+            mcc = 310, mnc = 410, areaCode = 12014, cellId = 1004521L, // 1004521 % 256 = 41 (> 6)
+            rsrpDbm = -90
+        )
+        val report = anomalyEngine.analyzeObservation(obs, Pair(37.7749, -122.4194), isPreviousConnection4GOr5G = false)
+        assertTrue(report.reasons.any { it.contains("Topology Anomaly", ignoreCase = true) })
     }
 }

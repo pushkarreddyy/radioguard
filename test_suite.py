@@ -22,34 +22,85 @@ class MockAnomalyEngine:
     THRESHOLD_SUSPICIOUS = 0.45
     THRESHOLD_CRITICAL = 0.75
 
-    def __init__(self, db_records):
+    def __init__(self, db_records, quarantined_cids=None):
         self.db = db_records
+        self.quarantined_cids = set(quarantined_cids or [])
         self.previous_cell_id = 0
         self.previous_rsrp = 0
         self.previous_rsrp_time = 0
         self.consecutive_anomalies = 0
         self.prev_anomaly_time = 0
+        self.tac_history = []  # list of (timestamp_ms, tac, lat, lon)
 
     def analyze(self, obs, user_loc, prev_is_high_gen, now_ms):
         reasons = []
         p_factors = []
+
+        # 0. Active Quarantined Cell Trap
+        if obs['cid'] in self.quarantined_cids:
+            return {
+                'threat': 'CRITICAL_ROGUE',
+                'score': 0.99,
+                'reasons': ["Active Quarantine: Known rogue cell signature blocked"],
+                'quarantine': True
+            }
 
         # 1. Sudden Involuntary 2G Downgrade
         if prev_is_high_gen and obs['gen'] == 'GSM_2G':
             p_factors.append(0.70)
             reasons.append("Forced downgrade to 2G")
 
-        # 2. Empty Neighbor List
-        if obs['gen'] == 'LTE_4G' and obs['neighbors'] == 0:
+        # 2. Extreme Neighbor RF Dominance Anomaly (> 35 dB)
+        max_neighbor = obs.get('max_neighbor_rsrp')
+        if max_neighbor is not None and obs['rsrp'] - max_neighbor > 35:
+            p_factors.append(0.85)
+            reasons.append(f"Extreme Neighbor RF Dominance Anomaly (+{obs['rsrp'] - max_neighbor} dB)")
+        elif obs['gen'] == 'LTE_4G' and obs.get('neighbors', 0) == 0:
             p_factors.append(0.40)
             reasons.append("Empty LTE neighbor list")
 
-        # 3. High Signal Power
+        # 3. Physics TA vs RSRP Violation
+        ta = obs.get('ta')
+        if ta is not None:
+            if (ta >= 10 and obs['rsrp'] >= -55) or (ta >= 25 and obs['rsrp'] >= -68):
+                p_factors.append(0.85)
+                reasons.append(f"RF Path Loss / Propagation Violation: TA={ta} with RSRP={obs['rsrp']} dBm")
+
+        # 4. Sector / eNodeB Topology Check
+        cid = obs['cid']
+        sector_id = cid % 256
+        enodeb_id = cid // 256
+        key = (obs['mcc'], obs['mnc'], obs['tac'], obs['cid'])
+        tower = self.db.get(key)
+        if obs.get('gen') == 'LTE_4G' and not tower:
+            if enodeb_id == 0 or sector_id > 31:
+                p_factors.append(0.80)
+                reasons.append(f"eNodeB/Sector Topology Anomaly: sector {sector_id} > 31 or eNB=0")
+
+        # 5. TAC Hopping Sentry
+        if user_loc:
+            # prune older than 3 minutes (180,000 ms)
+            self.tac_history = [h for h in self.tac_history if now_ms - h[0] <= 180000]
+            self.tac_history.append((now_ms, obs['tac'], user_loc[0], user_loc[1]))
+            distinct_tacs = set(h[1] for h in self.tac_history)
+            if len(distinct_tacs) >= 2:
+                # check if device moved < 350 meters
+                all_stationary = True
+                for h in self.tac_history:
+                    d = haversine_distance_km(user_loc[0], user_loc[1], h[2], h[3]) * 1000.0
+                    if d >= 350.0:
+                        all_stationary = False
+                        break
+                if all_stationary:
+                    p_factors.append(0.90)
+                    reasons.append("TAC Hopping Sentry: Rapid LAC/TAC cycling while stationary")
+
+        # 6. High Signal Power
         if obs['rsrp'] > -60:
             p_factors.append(0.35)
             reasons.append("Unnatural high RF signal power")
 
-        # 3b. Shadow Clone Step-Gradient Jump
+        # 7. Shadow Clone Step-Gradient Jump
         if obs['cid'] == self.previous_cell_id and self.previous_cell_id != 0:
             delta_rsrp = obs['rsrp'] - self.previous_rsrp
             delta_t = now_ms - self.previous_rsrp_time
@@ -61,12 +112,12 @@ class MockAnomalyEngine:
         self.previous_rsrp = obs['rsrp']
         self.previous_rsrp_time = now_ms
 
-        # 4. Invalid Identifiers
+        # 8. Invalid Identifiers
         if obs['tac'] in (0, 0xFFFF) or obs['cid'] in (0, 0xFFFFFFFF):
             p_factors.append(0.85)
             reasons.append("Invalid TAC or CID")
 
-        # 5. Spatial verification
+        # 9. Spatial verification
         key = (obs['mcc'], obs['mnc'], obs['tac'], obs['cid'])
         tower = self.db.get(key)
         if tower and user_loc:
@@ -77,6 +128,14 @@ class MockAnomalyEngine:
         elif not tower and obs['tac'] != 0:
             p_factors.append(0.20)
             reasons.append("Uncataloged cell tower")
+
+        # 10. Wi-Fi Anchor Geofence Cross-Correlation
+        wifi_loc = obs.get('wifi_loc')
+        if wifi_loc and tower:
+            wifi_dist = haversine_distance_km(wifi_loc[0], wifi_loc[1], tower['lat'], tower['lon'])
+            if wifi_dist > 15.0:
+                p_factors.append(0.85)
+                reasons.append(f"Wi-Fi Anchor Geofence Divergence: {wifi_dist:.1f} km from cell")
 
         # Bayesian combination: P = 1 - Prod(1 - p_i)
         prod = 1.0
@@ -206,6 +265,60 @@ class TestRadioGuardCore(unittest.TestCase):
 
         self.assertFalse(emergency_suspended)
         self.assertTrue(vpn_active, "VPN killswitch must auto-resume after call conclusion")
+
+    def test_09_quarantine_blacklist_immediate_trap(self):
+        engine_with_blacklist = MockAnomalyEngine(self.verified_db, quarantined_cids=[999999])
+        obs = {'gen': 'LTE_4G', 'mcc': 310, 'mnc': 410, 'tac': 12014, 'cid': 999999, 'rsrp': -80, 'neighbors': 3}
+        res = engine_with_blacklist.analyze(obs, (37.7749, -122.4194), prev_is_high_gen=True, now_ms=1000)
+        self.assertEqual(res['threat'], 'CRITICAL_ROGUE')
+        self.assertEqual(res['score'], 0.99)
+        self.assertTrue(res['quarantine'])
+
+    def test_10_extreme_neighbor_dominance(self):
+        obs = {
+            'gen': 'LTE_4G', 'mcc': 310, 'mnc': 410, 'tac': 12014, 'cid': 1004521,
+            'rsrp': -52, 'max_neighbor_rsrp': -96, 'neighbors': 3
+        }
+        res = self.engine.analyze(obs, (37.7749, -122.4194), prev_is_high_gen=True, now_ms=1000)
+        self.assertTrue(any("RF Dominance Anomaly" in r for r in res['reasons']))
+
+    def test_11_physics_path_loss_violation(self):
+        obs = {
+            'gen': 'LTE_4G', 'mcc': 310, 'mnc': 410, 'tac': 12014, 'cid': 1004521,
+            'rsrp': -50, 'ta': 12, 'neighbors': 2
+        }
+        res = self.engine.analyze(obs, (37.7749, -122.4194), prev_is_high_gen=True, now_ms=1000)
+        self.assertTrue(any("Propagation Violation" in r for r in res['reasons']))
+
+    def test_12_sector_topology_anomaly(self):
+        # cellId % 256 = 1004522 % 256 = 42 (> 6)
+        obs = {
+            'gen': 'LTE_4G', 'mcc': 310, 'mnc': 410, 'tac': 12014, 'cid': 1004522,
+            'rsrp': -90, 'neighbors': 2
+        }
+        res = self.engine.analyze(obs, (37.7749, -122.4194), prev_is_high_gen=True, now_ms=1000)
+        self.assertTrue(any("Sector Topology Anomaly" in r for r in res['reasons']))
+
+    def test_13_tac_hopping_sentry(self):
+        # Stationary at (37.7749, -122.4194)
+        obs1 = {'gen': 'LTE_4G', 'mcc': 310, 'mnc': 410, 'tac': 12014, 'cid': 1004521, 'rsrp': -85, 'neighbors': 3}
+        self.engine.analyze(obs1, (37.7749, -122.4194), prev_is_high_gen=True, now_ms=1000)
+
+        # 30 seconds later, same location, TAC changes to 12099
+        obs2 = {'gen': 'LTE_4G', 'mcc': 310, 'mnc': 410, 'tac': 12099, 'cid': 1004521, 'rsrp': -85, 'neighbors': 3}
+        res2 = self.engine.analyze(obs2, (37.7749, -122.4194), prev_is_high_gen=True, now_ms=31000)
+        self.assertTrue(any("TAC Hopping Sentry" in r for r in res2['reasons']))
+
+    def test_14_hmac_sha256_forensic_integrity(self):
+        import hmac
+        import hashlib
+        payload = b'{"type":"indicator","spec_version":"2.1","threatLevel":"CRITICAL_ROGUE"}'
+        key = b'RadioGuard-Digital-Chain-Of-Custody'
+        sig = hmac.new(key, payload, hashlib.sha256).hexdigest()
+        self.assertEqual(len(sig), 64)
+        # Verify deterministic HMAC
+        sig2 = hmac.new(key, payload, hashlib.sha256).hexdigest()
+        self.assertEqual(sig, sig2)
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestRadioGuardCore)

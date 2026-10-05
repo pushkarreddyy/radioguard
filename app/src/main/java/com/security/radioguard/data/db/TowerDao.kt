@@ -56,4 +56,25 @@ interface TowerDao {
 
     @Query("DELETE FROM incident_logs")
     suspend fun clearIncidentLogs()
+
+    // --- Active Rogue Cell Quarantine Blacklist Queries ---
+
+    @Query("""
+        SELECT COUNT(*) > 0 FROM quarantined_cells 
+        WHERE mcc = :mcc AND mnc = :mnc AND areaCode = :areaCode AND cellId = :cellId
+    """)
+    suspend fun isCellQuarantined(mcc: Int, mnc: Int, areaCode: Int, cellId: Long): Boolean
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun quarantineCell(entry: com.security.radioguard.data.model.QuarantinedCellEntity)
+
+    @Query("SELECT * FROM quarantined_cells ORDER BY detectedTimestamp DESC")
+    suspend fun getAllQuarantinedCells(): List<com.security.radioguard.data.model.QuarantinedCellEntity>
+
+    @Query("DELETE FROM quarantined_cells WHERE cellId = :cellId")
+    suspend fun unquarantineCell(cellId: Long)
+
+    @Query("DELETE FROM quarantined_cells")
+    suspend fun clearQuarantinedCells()
 }
+
