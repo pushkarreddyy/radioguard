@@ -39,6 +39,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: "8.6"
+          cache-disabled: true
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -63,10 +64,12 @@ jobs:
           ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee gradle_build_output.txt || {
             BUILD_STATUS=$?
             echo "::error title=Gradle Build Failed::assembleDebug exited with code $BUILD_STATUS"
-            echo "### ❌ Gradle Build Failure Log (Last 100 lines)" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            tail -n 100 gradle_build_output.txt >> $GITHUB_STEP_SUMMARY || true
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -inE "(e: |error|FAILURE|Exception|Caused by|What went wrong)" gradle_build_output.txt | head -n 25 | while IFS= read -r errline; do
+              echo "::error title=GradleError::$errline"
+            done
+            tail -n 25 gradle_build_output.txt | while IFS= read -r tailline; do
+              echo "::error title=BuildTail::$tailline"
+            done
             exit $BUILD_STATUS
           }
 
